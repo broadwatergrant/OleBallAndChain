@@ -1,11 +1,16 @@
 import './Main.css';
 import React from 'react';
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SignInControl from './components/Auth/SignInControl';
 import App from './components/App';
+import MyHomeControl from './components/MyHomeControl';
+import Services from './components/Services/Services';
+import ServiceCreator from './components/Services/ServiceCreator';
+import NoPage from './components/NoPage';
 
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { getDatabase, ref, get, child, update } from "firebase/database";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDcBvxXxBucncF7wW_RkbQIKpRVKCuM4AE",
@@ -25,48 +30,39 @@ class Main extends React.Component {
   constructor() {
     super();
     this.auth = getAuth();
-    this.db = getDatabase();
+    this.db = getFirestore();
     this.state = {user: null};
 
     this.handlePotentialNewUser = this.handlePotentialNewUser.bind(this);
     this.postNewUserData = this.postNewUserData.bind(this);
   }
 
-  postNewUserData(user) {
+  async postNewUserData(user) {
     if(!user || !user.email || !user.uid || !user.displayName) {
       console.error("Cannot post new user data for invalid user");
       return;
     }
 
-    const userRef = ref(this.db, 'user');
-    const userKey = user.uid;
-
     const userData = {
-      uid: user.uid,
       displayName: user.displayName,
       email: user.email
     };
 
-    const updates = {};
-    updates['/' + userKey] = userData;
-
-    update(userRef, updates);
+    await setDoc(doc(this.db, "user", user.uid), userData);
   }
 
-  handlePotentialNewUser(user) {
+  async handlePotentialNewUser(user) {
     if(!user || !user.uid) {
       console.error("Cannot handle null user");
       return;
     }
 
-    const userRef = ref(this.db, 'user');
-    get(child(userRef, user.uid)).then((snapshot) => {
-      if(!snapshot.exists()) {
-        this.postNewUserData(user);
-      }
-    }).catch((error) => {
-      console.error(error);
-    });
+    const userRef = doc(this.db, "user", user.uid);
+    const userData = await getDoc(userRef);
+
+    if(!userData.exists()) {
+      this.postNewUserData(user);
+    }
   }
   
   componentDidMount() {  
@@ -85,9 +81,18 @@ class Main extends React.Component {
       return (
         <div className="App">
           <header className="App-header">
-            <App />
+            <BrowserRouter>
+              <Routes>
+                  <Route index element={<App />} />
+                  <Route path="MyHome" element={<MyHomeControl />}/>
+                  <Route path="Services" element={<Services />}/>
+                  <Route path="Services/Create" element={<ServiceCreator />}/>
+                  <Route path="*" element={<NoPage />} />
+              </Routes>
+            </BrowserRouter>
           </header>
         </div>
+
       );
     } else {
       return (
@@ -99,6 +104,7 @@ class Main extends React.Component {
       );
     }
   }
+
 }
 
 export default Main;
